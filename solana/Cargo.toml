@@ -1,0 +1,51 @@
+[package]
+name = "solana"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies.solana-program]
+version = "1.16"
+[dependencies.wormhole-anchor-sdk]
+version = "0.1.0-alpha.2"
+[dependencies.wormhole-core-bridge-solana]
+version = "0.0.0-alpha.6"
+[dependencies.arrayref]
+version = "0.3.7"
+[dependencies.borsh]
+version = "0.10"
+
+[profile.release]
+opt-level = 3
+incremental = false
+codegen-units = 1
+lto = "fat"
+
+[profile.release.build-override.solana-program]
+opt-level = 3
+incremental = false
+codegen-units = 1
+lto = "fat"
+
+[profile.release.build-override.borsh]
+opt-level = 3
+incremental = false
+codegen-units = 1
+lto = "fat"
+
+[profile.release.build-override.arrayref]
+opt-level = 3
+incremental = false
+codegen-units = 1
+lto = "fat"
+[profile.release.build-override.wormhole-core-bridge-solana]
+opt-level = 3
+incremental = false
+codegen-units = 1
+lto = "fat"
+[profile.release.build-override.wormhole-anchor-sdk]
+opt-level = 3
+incremental = false
+codegen-units = 1
+lto = "fat"
