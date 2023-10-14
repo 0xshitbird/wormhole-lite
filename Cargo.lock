@@ -1760,17 +1760,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "942b4a808e05215192e39f4ab80813e599068285906cc91aa64f923db842bd5a"
 
 [[package]]
-name = "solana"
-version = "0.1.0"
-dependencies = [
- "arrayref",
- "borsh 0.10.3",
- "solana-program",
- "wormhole-anchor-sdk",
- "wormhole-core-bridge-solana",
-]
-
-[[package]]
 name = "solana-frozen-abi"
 version = "1.16.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2423,6 +2412,17 @@ checksum = "d1a069e2dd4b3db0899b5e2284d866ada874952c9c64cede1011d11dc839231d"
 dependencies = [
  "ruint",
  "ruint-macro",
+]
+
+[[package]]
+name = "wormhole-solana-lite"
+version = "0.1.0"
+dependencies = [
+ "arrayref",
+ "borsh 0.10.3",
+ "solana-program",
+ "wormhole-anchor-sdk",
+ "wormhole-core-bridge-solana",
 ]
 
 [[package]]

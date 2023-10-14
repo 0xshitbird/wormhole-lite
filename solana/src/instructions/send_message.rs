@@ -237,56 +237,63 @@ impl<'info> Accounts<'info> {
             panic!("invalid accounts");
         }
     }
-    /// sends a message via wormhole using CPI
-    /// https://docs.rs/wormhole-core-bridge-solana/0.0.0-alpha.6/wormhole_core_bridge_solana/
-    ///
-    /// this is not tested within this actual crate
-    pub fn send_message(
-        &self,
-        // address of the program invoking teh cpi call
-        executing_program_id: Pubkey,
-        batch_id: u32,
-        payload: Vec<u8>,
-    ) -> ProgramResult {
-        let (sequence_pda, _, emitter_pda, emitter_nonce) = {
-            let emitter = Emitter::unpack(&self.emitter.data.borrow())?;
-            let (sequence_pda, sequence_nonce) = emitter.derive_sequence();
-            let (emitter_pda, emitter_nonce) = emitter.derive();
-            (sequence_pda, sequence_nonce, emitter_pda, emitter_nonce)
-        };
-        let next_publishable_nonce =
-            Emitter::slice_next_publishable_nonce(&self.emitter.data.borrow());
-        let (message_pda, message_nonce) =
-            derive_message_pda(executing_program_id, next_publishable_nonce);
-
-        // validate all accounts to be used in the instruction
-        self.try_validate(emitter_pda, message_pda, sequence_pda, executing_program_id);
-
-        let ix = self.fee_collector_ix();
-        invoke(&ix, &[self.payer.clone(), self.core_fee_collector.clone()])?;
-
-        let ix = self.post_message_ix(batch_id, payload, Finality::Finalized);
-        invoke_signed(
-            &ix,
-            &self.to_vec(),
-            &[
-                &[Emitter::seed(), &[emitter_nonce]],
-                &[
-                    b"message",
-                    &next_publishable_nonce.to_le_bytes()[..],
-                    &[message_nonce],
-                ],
-            ],
-        )?;
-
-        // increment the nonce used for message account derivation
-        let mut emitter = Emitter::unpack(&self.emitter.data.borrow())?;
-        emitter.next_publishable_nonce = emitter.next_publishable_nonce.checked_add(1).unwrap();
-        Emitter::pack(emitter, &mut self.emitter.data.borrow_mut())?;
-        Ok(())
-    }
 }
+/// sends a message via wormhole using CPI
+/// https://docs.rs/wormhole-core-bridge-solana/0.0.0-alpha.6/wormhole_core_bridge_solana/
+///
+/// this is not tested within this actual crate
+pub fn send_message<'info>(
+    program_id: Pubkey,
+    accounts: &[AccountInfo<'info>],
+    // address of the program invoking teh cpi call
+    executing_program_id: Pubkey,
+    batch_id: u32,
+    payload: Vec<u8>,
+) -> ProgramResult {
+    let account_infos = Accounts::from(accounts);
+    let (sequence_pda, _, emitter_pda, emitter_nonce) = {
+        let emitter = Emitter::unpack(&account_infos.emitter.data.borrow())?;
+        let (sequence_pda, sequence_nonce) = emitter.derive_sequence();
+        let (emitter_pda, emitter_nonce) = emitter.derive();
+        (sequence_pda, sequence_nonce, emitter_pda, emitter_nonce)
+    };
+    let next_publishable_nonce =
+        Emitter::slice_next_publishable_nonce(&account_infos.emitter.data.borrow());
+    let (message_pda, message_nonce) =
+        derive_message_pda(executing_program_id, next_publishable_nonce);
 
+    // validate all accounts to be used in the instruction
+    account_infos.try_validate(emitter_pda, message_pda, sequence_pda, executing_program_id);
+
+    let ix = account_infos.fee_collector_ix();
+    invoke(
+        &ix,
+        &[
+            account_infos.payer.clone(),
+            account_infos.core_fee_collector.clone(),
+        ],
+    )?;
+
+    let ix = account_infos.post_message_ix(batch_id, payload, Finality::Finalized);
+    invoke_signed(
+        &ix,
+        &account_infos.to_vec(),
+        &[
+            &[Emitter::seed(), &[emitter_nonce]],
+            &[
+                b"message",
+                &next_publishable_nonce.to_le_bytes()[..],
+                &[message_nonce],
+            ],
+        ],
+    )?;
+
+    // increment the nonce used for message account derivation
+    let mut emitter = Emitter::unpack(&account_infos.emitter.data.borrow())?;
+    emitter.next_publishable_nonce = emitter.next_publishable_nonce.checked_add(1).unwrap();
+    Emitter::pack(emitter, &mut account_infos.emitter.data.borrow_mut())?;
+    Ok(())
+}
 #[cfg(test)]
 mod test {
     use solana_program::system_instruction::SystemInstruction;
