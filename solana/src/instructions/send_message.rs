@@ -210,14 +210,6 @@ impl<'info> Accounts<'info> {
             sol_log("invalid bridge config owner");
             return false;
         }
-        if self
-            .core_fee_collector
-            .owner
-            .ne(self.core_bridge_program.key)
-        {
-            sol_log("invalid fee collector owner");
-            return false;
-        }
         if self.emitter.owner.ne(&executing_program_id) {
             sol_log("invalid emitter owner");
             return false;
