@@ -245,8 +245,6 @@ impl<'info> Accounts<'info> {
 pub fn send_message<'info>(
     program_id: Pubkey,
     accounts: &[AccountInfo<'info>],
-    // address of the program invoking teh cpi call
-    executing_program_id: Pubkey,
     batch_id: u32,
     payload: Vec<u8>,
 ) -> ProgramResult {
@@ -260,10 +258,10 @@ pub fn send_message<'info>(
     let next_publishable_nonce =
         Emitter::slice_next_publishable_nonce(&account_infos.emitter.data.borrow());
     let (message_pda, message_nonce) =
-        derive_message_pda(executing_program_id, next_publishable_nonce);
+        derive_message_pda(program_id, next_publishable_nonce);
 
     // validate all accounts to be used in the instruction
-    account_infos.try_validate(emitter_pda, message_pda, sequence_pda, executing_program_id);
+    account_infos.try_validate(emitter_pda, message_pda, sequence_pda, program_id);
 
     let ix = account_infos.fee_collector_ix();
     invoke(
