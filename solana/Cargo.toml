@@ -15,37 +15,3 @@ version = "0.0.0-alpha.6"
 version = "0.3.7"
 [dependencies.borsh]
 version = "0.10"
-
-[profile.release]
-opt-level = 3
-incremental = false
-codegen-units = 1
-lto = "fat"
-
-[profile.release.build-override.solana-program]
-opt-level = 3
-incremental = false
-codegen-units = 1
-lto = "fat"
-
-[profile.release.build-override.borsh]
-opt-level = 3
-incremental = false
-codegen-units = 1
-lto = "fat"
-
-[profile.release.build-override.arrayref]
-opt-level = 3
-incremental = false
-codegen-units = 1
-lto = "fat"
-[profile.release.build-override.wormhole-core-bridge-solana]
-opt-level = 3
-incremental = false
-codegen-units = 1
-lto = "fat"
-[profile.release.build-override.wormhole-anchor-sdk]
-opt-level = 3
-incremental = false
-codegen-units = 1
-lto = "fat"

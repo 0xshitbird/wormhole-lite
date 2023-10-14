@@ -1,4 +1,6 @@
+use crate::{state::emitter::Emitter, utils::derivations::derive_message_pda, WORMHOLE_PROGRAM_ID};
 use borsh::ser::BorshSerialize;
+use solana_program::log::sol_log;
 use solana_program::{
     account_info::AccountInfo,
     entrypoint::ProgramResult,
@@ -6,11 +8,9 @@ use solana_program::{
     program::{invoke, invoke_signed},
     program_pack::Pack,
     pubkey::Pubkey,
-    system_instruction, sysvar, system_program,
+    system_instruction, system_program, sysvar,
 };
 use wormhole_anchor_sdk::wormhole::Finality;
-use solana_program::log::sol_log;
-use crate::{state::emitter::Emitter, utils::derivations::derive_message_pda, WORMHOLE_PROGRAM_ID};
 /// when invoking an instruction that publishes a message through wormhole, these are the accounts
 /// that must be used in the instruction
 pub struct TransactionAccountKeys {
@@ -165,6 +165,7 @@ impl<'info> Accounts<'info> {
         &self,
         emitter_pda: Pubkey,
         message_pda: Pubkey,
+        sequence_pda: Pubkey,
         executing_program_id: Pubkey,
     ) -> bool {
         // validate account keys
@@ -192,29 +193,54 @@ impl<'info> Accounts<'info> {
             sol_log("invalid message");
             return false;
         }
+        if self.core_emitter_sequence.key.ne(&sequence_pda) {
+            sol_log("invalid sequence");
+            return false;
+        }
         // validate account owners
         if executing_program_id.ne(self.emitter.owner) {
             sol_log("invalid emitter account owner");
             return false;
         }
-        if self.core_bridge_config.key.ne(self.core_bridge_program.key) {
+        if self
+            .core_bridge_config
+            .owner
+            .ne(self.core_bridge_program.key)
+        {
             sol_log("invalid bridge config owner");
             return false;
         }
-        if self.core_fee_collector.key.ne(self.core_bridge_program.key) {
+        if self
+            .core_fee_collector
+            .owner
+            .ne(self.core_bridge_program.key)
+        {
             sol_log("invalid fee collector owner");
             return false;
         }
+        if self.emitter.owner.ne(&executing_program_id) {
+            sol_log("invalid emitter owner");
+            return false;
+        }
+        // sequence account may not be initialized yet
         // other ownership doesnt need to be verified since that is handle by wormhole program
         true
     }
-    pub fn try_validate(&self, emitter_pda: Pubkey, message_pda: Pubkey, executing_program_id: Pubkey) {
-        if !self.validate(emitter_pda, message_pda, executing_program_id) {
+    pub fn try_validate(
+        &self,
+        emitter_pda: Pubkey,
+        message_pda: Pubkey,
+        sequence_pda: Pubkey,
+        executing_program_id: Pubkey,
+    ) {
+        if !self.validate(emitter_pda, message_pda, sequence_pda, executing_program_id) {
             panic!("invalid accounts");
         }
     }
-    /// sends a message on wormhole
+    /// sends a message via wormhole using CPI
     /// https://docs.rs/wormhole-core-bridge-solana/0.0.0-alpha.6/wormhole_core_bridge_solana/
+    ///
+    /// this is not tested within this actual crate
     pub fn send_message(
         &self,
         // address of the program invoking teh cpi call
@@ -222,19 +248,22 @@ impl<'info> Accounts<'info> {
         batch_id: u32,
         payload: Vec<u8>,
     ) -> ProgramResult {
-
+        let (sequence_pda, _, emitter_pda, emitter_nonce) = {
+            let emitter = Emitter::unpack(&self.emitter.data.borrow())?;
+            let (sequence_pda, sequence_nonce) = emitter.derive_sequence();
+            let (emitter_pda, emitter_nonce) = emitter.derive();
+            (sequence_pda, sequence_nonce, emitter_pda, emitter_nonce)
+        };
         let next_publishable_nonce =
             Emitter::slice_next_publishable_nonce(&self.emitter.data.borrow());
-        let (emitter_pda, emitter_nonce) = Emitter::derive(executing_program_id);
         let (message_pda, message_nonce) =
             derive_message_pda(executing_program_id, next_publishable_nonce);
 
         // validate all accounts to be used in the instruction
-        self.try_validate(emitter_pda, message_pda, executing_program_id);
+        self.try_validate(emitter_pda, message_pda, sequence_pda, executing_program_id);
 
         let ix = self.fee_collector_ix();
         invoke(&ix, &[self.payer.clone(), self.core_fee_collector.clone()])?;
-
 
         let ix = self.post_message_ix(batch_id, payload, Finality::Finalized);
         invoke_signed(
@@ -255,5 +284,284 @@ impl<'info> Accounts<'info> {
         emitter.next_publishable_nonce = emitter.next_publishable_nonce.checked_add(1).unwrap();
         Emitter::pack(emitter, &mut self.emitter.data.borrow_mut())?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use solana_program::system_instruction::SystemInstruction;
+
+    use crate::{
+        utils::derivations::{
+            derive_core_bridge_config, derive_core_fee_collector, derive_emitter, derive_sequence,
+        },
+        WORMHOLE_TOKEN_BRIDGE_PROGRAM_ID,
+    };
+
+    use super::*;
+    fn core_bridge_config() -> Pubkey {
+        derive_core_bridge_config().0
+    }
+    fn core_message_account(program_id: Pubkey, nonce: u64) -> Pubkey {
+        derive_message_pda(program_id, nonce).0
+    }
+    fn emitter(program_id: Pubkey) -> Pubkey {
+        derive_emitter(program_id).0
+    }
+    fn core_emitter_sequence(emitter: Pubkey) -> Pubkey {
+        derive_sequence(emitter).0
+    }
+    fn payer() -> Pubkey {
+        let mut info: [u8; 32] = [0_u8; 32];
+        info[0] = 5;
+        info[1] = 5;
+        Pubkey::new_from_array(info)
+    }
+    fn core_fee_collector() -> Pubkey {
+        derive_core_fee_collector().0
+    }
+    #[test]
+    fn test_transaction_account_keys() {
+        let pid = WORMHOLE_TOKEN_BRIDGE_PROGRAM_ID;
+        let accts = TransactionAccountKeys {
+            core_bridge_config: core_bridge_config(),
+            core_message_account: core_message_account(pid, 69),
+            emitter: emitter(pid),
+            core_emitter_sequence: core_emitter_sequence(emitter(pid)),
+            payer: payer(),
+            core_fee_collector: core_fee_collector(),
+            clock: sysvar::clock::id(),
+            system_program: system_program::id(),
+            rent: sysvar::rent::id(),
+            core_bridge_program: WORMHOLE_PROGRAM_ID,
+        };
+        let expected_metas = vec![
+            AccountMeta::new(accts.core_bridge_config, false), // 0
+            AccountMeta::new(accts.core_message_account, false), // 1
+            AccountMeta::new(accts.emitter, false),            // 2
+            AccountMeta::new(accts.core_emitter_sequence, false), // 3
+            AccountMeta::new(accts.payer, true),               // 4
+            AccountMeta::new(accts.core_fee_collector, false), // 5
+            AccountMeta::new_readonly(accts.clock, false),     // 6
+            AccountMeta::new_readonly(accts.system_program, false), // 7
+            AccountMeta::new_readonly(accts.rent, false),      // 8
+            AccountMeta::new_readonly(accts.core_bridge_program, false), // 9
+        ];
+        let got_metas = accts.to_account_metas();
+        assert_eq!(got_metas, expected_metas);
+    }
+    #[test]
+    fn test_account_infos() {
+        let key = Pubkey::new_unique();
+        let mut data = vec![5; 80];
+        let mut lamports = 42;
+        let mut data2 = vec![5; 80];
+        let mut lamports2 = 42;
+        let mut data3 = vec![5; 80];
+        let mut lamports3 = 42;
+        let mut data4 = vec![5; 80];
+        let mut lamports4 = 42;
+        let mut data5 = vec![5; 80];
+        let mut lamports5 = 42;
+        let mut data6 = vec![5; 80];
+        let mut lamports6 = 42;
+        let mut data7 = vec![5; 80];
+        let mut lamports7 = 42;
+        let mut data8 = vec![5; 80];
+        let mut lamports8 = 42;
+        let mut data9 = vec![5; 80];
+        let mut lamports9 = 42;
+        let mut data10 = vec![5; 80];
+        let mut lamports10 = 42;
+        let pid = WORMHOLE_TOKEN_BRIDGE_PROGRAM_ID;
+        let sysvar_id = sysvar::id();
+        let accts = TransactionAccountKeys {
+            core_bridge_config: core_bridge_config(),
+            core_message_account: core_message_account(pid, 69),
+            emitter: emitter(pid),
+            core_emitter_sequence: core_emitter_sequence(emitter(pid)),
+            payer: payer(),
+            core_fee_collector: core_fee_collector(),
+            clock: sysvar::clock::id(),
+            system_program: system_program::id(),
+            rent: sysvar::rent::id(),
+            core_bridge_program: WORMHOLE_PROGRAM_ID,
+        };
+        let core_bridge_config = AccountInfo::new(
+            &accts.core_bridge_config,
+            false,
+            false,
+            &mut lamports,
+            &mut data,
+            &WORMHOLE_PROGRAM_ID,
+            false,
+            0,
+        );
+        let core_message_account = AccountInfo::new(
+            &accts.core_message_account,
+            false,
+            false,
+            &mut lamports2,
+            &mut data2,
+            &key,
+            false,
+            0,
+        );
+        let emitter = AccountInfo::new(
+            &accts.emitter,
+            false,
+            false,
+            &mut lamports3,
+            &mut data3,
+            &pid,
+            false,
+            0,
+        );
+        let core_emitter_sequence = AccountInfo::new(
+            &accts.core_emitter_sequence,
+            false,
+            false,
+            &mut lamports4,
+            &mut data4,
+            &WORMHOLE_PROGRAM_ID,
+            false,
+            0,
+        );
+        let payer = AccountInfo::new(
+            &accts.payer,
+            false,
+            false,
+            &mut lamports5,
+            &mut data5,
+            &key,
+            false,
+            0,
+        );
+        let core_fee_collector = AccountInfo::new(
+            &accts.core_fee_collector,
+            false,
+            false,
+            &mut lamports6,
+            &mut data6,
+            &WORMHOLE_PROGRAM_ID,
+            false,
+            0,
+        );
+        let clock = AccountInfo::new(
+            &accts.clock,
+            false,
+            false,
+            &mut lamports7,
+            &mut data7,
+            &sysvar_id,
+            false,
+            0,
+        );
+        let system_program = AccountInfo::new(
+            &accts.system_program,
+            false,
+            false,
+            &mut lamports8,
+            &mut data8,
+            &key,
+            false,
+            0,
+        );
+        let rent = AccountInfo::new(
+            &accts.rent,
+            false,
+            false,
+            &mut lamports9,
+            &mut data9,
+            &sysvar_id,
+            false,
+            0,
+        );
+        let core_bridge_program = AccountInfo::new(
+            &WORMHOLE_PROGRAM_ID,
+            false,
+            false,
+            &mut lamports10,
+            &mut data10,
+            &WORMHOLE_PROGRAM_ID,
+            false,
+            0,
+        );
+
+        let account_infos_vec = vec![
+            core_bridge_config.clone(),
+            core_message_account.clone(),
+            emitter.clone(),
+            core_emitter_sequence.clone(),
+            payer.clone(),
+            core_fee_collector.clone(),
+            clock.clone(),
+            system_program.clone(),
+            rent.clone(),
+            core_bridge_program.clone(),
+        ];
+
+        let accounts: Accounts<'_> = Accounts::from(&account_infos_vec[..]);
+
+        assert_eq!(*accounts.core_bridge_config.key, accts.core_bridge_config);
+        assert_eq!(
+            *accounts.core_message_account.key,
+            accts.core_message_account
+        );
+        assert_eq!(*accounts.emitter.key, accts.emitter);
+        assert_eq!(
+            *accounts.core_emitter_sequence.key,
+            accts.core_emitter_sequence
+        );
+        assert_eq!(*accounts.payer.key, accts.payer);
+        assert_eq!(*accounts.core_fee_collector.key, accts.core_fee_collector);
+        assert_eq!(*accounts.clock.key, accts.clock);
+        assert_eq!(*accounts.system_program.key, accts.system_program);
+        assert_eq!(*accounts.rent.key, accts.rent);
+        assert_eq!(*accounts.core_bridge_program.key, accts.core_bridge_program);
+
+        for (a1, a2) in accounts.to_vec().iter().zip(account_infos_vec.iter()) {
+            assert_eq!(a1.key, a2.key);
+        }
+        assert!(accounts.validate(
+            accts.emitter,
+            accts.core_message_account,
+            accts.core_emitter_sequence,
+            pid,
+        ));
+        assert!(!accounts.validate(
+            accts.emitter,
+            accts.core_message_account,
+            accts.core_emitter_sequence,
+            Pubkey::new_unique(),
+        ));
+        let fee_collector_ix = accounts.fee_collector_ix();
+        assert_eq!(
+            fee_collector_ix,
+            Instruction::new_with_bincode(
+                system_program::id(),
+                &SystemInstruction::Transfer { lamports: 100 },
+                vec![
+                    AccountMeta::new(*accounts.payer.key, true),
+                    AccountMeta::new(*accounts.core_fee_collector.key, false)
+                ]
+            )
+        );
+        let post_msg_ix =
+            accounts.post_message_ix(69, b"Hello World".to_vec(), Finality::Finalized);
+        assert_eq!(
+            post_msg_ix,
+            Instruction {
+                program_id: WORMHOLE_PROGRAM_ID,
+                accounts: accts.to_account_metas(),
+                data: wormhole_anchor_sdk::wormhole::Instruction::PostMessage {
+                    batch_id: 69,
+                    payload: b"Hello World".to_vec(),
+                    finality: Finality::Finalized
+                }
+                .try_to_vec()
+                .unwrap()
+            }
+        )
     }
 }
