@@ -56,6 +56,21 @@ impl TransactionAccountKeys {
             AccountMeta::new_readonly(self.core_bridge_program, false), // 9
         ]
     }
+    /// returns a vector of AccountMeta objects poublishing a message via cpi
+    pub fn to_cpi_account_metas(&self) -> Vec<AccountMeta> {
+        vec![
+            AccountMeta::new(self.core_bridge_config, false), // 0
+            AccountMeta::new(self.core_message_account, true), // 1
+            AccountMeta::new(self.emitter, true),             // 2
+            AccountMeta::new(self.core_emitter_sequence, false), // 3
+            AccountMeta::new(self.payer, true),               // 4
+            AccountMeta::new(self.core_fee_collector, false), // 5
+            AccountMeta::new_readonly(self.clock, false),     // 6
+            AccountMeta::new_readonly(self.system_program, false), // 7
+            AccountMeta::new_readonly(self.rent, false),      // 8
+            AccountMeta::new_readonly(self.core_bridge_program, false), // 9
+        ]
+    }
 }
 
 /// on-chain object pointing to the actual accounts
@@ -249,8 +264,7 @@ pub fn send_message<'info>(
     };
     let next_publishable_nonce =
         Emitter::slice_next_publishable_nonce(&account_infos.emitter.data.borrow());
-    let (message_pda, message_nonce) =
-        derive_message_pda(program_id, next_publishable_nonce);
+    let (message_pda, message_nonce) = derive_message_pda(program_id, next_publishable_nonce);
 
     // validate all accounts to be used in the instruction
     account_infos.try_validate(emitter_pda, message_pda, sequence_pda, program_id);
