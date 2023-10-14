@@ -165,7 +165,7 @@ impl<'info> Accounts<'info> {
     ) -> Instruction {
         Instruction {
             program_id: *self.core_bridge_program.key,
-            accounts: TransactionAccountKeys::from(self).to_account_metas(),
+            accounts: TransactionAccountKeys::from(self).to_cpi_account_metas(),
             data: wormhole_anchor_sdk::wormhole::Instruction::PostMessage {
                 batch_id,
                 payload,
