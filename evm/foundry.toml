@@ -1,0 +1,21 @@
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+auto_detect_solc = true
+via_ir = true
+optimize = true
+optimizer_runs = 1_000
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+via-ir = true
+ir-optimized = true
+asm = true
+asm-optimized = true
+evm-version = "paris"
+remappings = [
+    "forge-std/=lib/forge-std/src/",
+    "solmate/=lib/solmate/src/",
+    "solidity-json-writer/=lib/solidity-json-writer/contracts"
+]
+# caches storage retrieved locally for certain chains an
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
