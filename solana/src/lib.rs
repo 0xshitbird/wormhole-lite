@@ -9,6 +9,9 @@ pub mod utils;
 /// instructions for invoking the wormhole bridge program through cpi
 pub mod instructions;
 
+/// structured payloads for handling arbitrary messages
+pub mod message_payload;
+
 /// id of the core wormhole program
 pub const WORMHOLE_PROGRAM_ID: Pubkey =
     solana_program::pubkey!("worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth");

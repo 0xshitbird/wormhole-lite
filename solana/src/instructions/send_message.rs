@@ -1,3 +1,4 @@
+use crate::message_payload::Payload;
 use crate::{state::emitter::Emitter, utils::derivations::derive_message_pda, WORMHOLE_PROGRAM_ID};
 use borsh::ser::BorshSerialize;
 use solana_program::log::sol_log;
@@ -253,7 +254,7 @@ pub fn send_message<'info>(
     program_id: Pubkey,
     accounts: &[AccountInfo<'info>],
     batch_id: u32,
-    payload: Vec<u8>,
+    payload: Payload
 ) -> ProgramResult {
     let account_infos = Accounts::from(accounts);
     let (sequence_pda, _, emitter_pda, emitter_nonce) = {
@@ -278,7 +279,7 @@ pub fn send_message<'info>(
         ],
     )?;
 
-    let ix = account_infos.post_message_ix(batch_id, payload, Finality::Finalized);
+    let ix = account_infos.post_message_ix(batch_id, payload.try_to_vec()?, Finality::Finalized);
     invoke_signed(
         &ix,
         &account_infos.to_vec(),
@@ -564,7 +565,7 @@ mod test {
             post_msg_ix,
             Instruction {
                 program_id: WORMHOLE_PROGRAM_ID,
-                accounts: accts.to_account_metas(),
+                accounts: accts.to_cpi_account_metas(),
                 data: wormhole_anchor_sdk::wormhole::Instruction::PostMessage {
                     batch_id: 69,
                     payload: b"Hello World".to_vec(),
