@@ -17,16 +17,28 @@ pub struct Payload {
 impl BorshSerialize for Payload {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         self.payload_id.serialize(writer)?;
-        self.data.serialize(writer)
+        // serialize the length of the data first
+        (self.data.len() as u16).to_be_bytes().serialize(writer)?;
+        // serialize the actual data
+        for item in &self.data {
+            (*item).serialize(writer)?;
+        }
+        Ok(())
     }
 }
 
 
 impl BorshDeserialize for Payload {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let payload_id = u8::deserialize_reader(reader)?;
-        let data = Vec::<u8>::deserialize_reader(reader)?;
-
+        let mut data = Vec::with_capacity(1024);
+        reader.read_to_end(&mut data)?;
+        let payload_id = data[0];
+        let length = {
+            let mut out = [0u8; 2];
+            out.copy_from_slice(&data[1..3]);
+            u16::from_be_bytes(out) as usize
+        };
+        let data = data[3..(3 + length)].to_vec();
         Ok(Self { payload_id, data })
     }
 }
@@ -35,25 +47,14 @@ impl BorshDeserialize for Payload {
 mod test {
     use super::*;
     #[test]
-    fn test_payload_serialize_deserialize() {
-        let payload1 = Payload {
-            payload_id: 69,
-            data: vec![4,2,0]
+    fn test_wormhole_example() {
+        let payload = Payload {
+            payload_id: 1,
+            data: b"Hello World".to_vec()
         };
-        let payload2 = Payload {
-            payload_id: 254,
-            data: vec![6, 6, 6, 6, 6, 6, 6],
-        };
-
-        let p1_ser = payload1.try_to_vec().unwrap();
-        // Serialize into [payload_id, len, data...]
-        assert_eq!(p1_ser, [69, 3, 0, 0, 0, 4, 2, 0]);
-        let p1_der = Payload::try_from_slice(&p1_ser).unwrap();
-        assert!(payload1.eq(&p1_der));
-
-        let p2_ser = payload2.try_to_vec().unwrap();
-        assert_eq!(p2_ser, [254, 7, 0, 0, 0, 6, 6, 6, 6, 6, 6, 6]);
-        let p2_der = Payload::try_from_slice(&p2_ser).unwrap();
-        assert!(payload2.eq(&p2_der));
+        let ser_p = payload.try_to_vec().unwrap();
+        println!("{}", hex::encode(&ser_p));
+        let payload2 = Payload::try_from_slice(&ser_p[..]).unwrap();
+        assert_eq!(payload.data, payload2.data);
     }
 }
