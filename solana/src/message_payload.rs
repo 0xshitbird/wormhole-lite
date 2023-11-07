@@ -1,5 +1,4 @@
-use borsh::{BorshSerialize, BorshDeserialize};
-
+use borsh::{BorshDeserialize, BorshSerialize};
 
 /// an object representing an arbitrary payload to relay through wormhole, whereby the
 /// `payload_id` is used to identify the specific instruction/function to execute and
@@ -13,7 +12,6 @@ pub struct Payload {
     pub data: Vec<u8>,
 }
 
-
 impl BorshSerialize for Payload {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         self.payload_id.serialize(writer)?;
@@ -26,7 +24,6 @@ impl BorshSerialize for Payload {
         Ok(())
     }
 }
-
 
 impl BorshDeserialize for Payload {
     fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
@@ -50,7 +47,7 @@ mod test {
     fn test_wormhole_example() {
         let payload = Payload {
             payload_id: 1,
-            data: b"Hello World".to_vec()
+            data: b"Hello World".to_vec(),
         };
         let ser_p = payload.try_to_vec().unwrap();
         println!("{}", hex::encode(&ser_p));

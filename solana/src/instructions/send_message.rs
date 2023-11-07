@@ -254,7 +254,7 @@ pub fn send_message<'info>(
     program_id: Pubkey,
     accounts: &[AccountInfo<'info>],
     batch_id: u32,
-    payload: Payload
+    payload: Payload,
 ) -> ProgramResult {
     let account_infos = Accounts::from(accounts);
     let (sequence_pda, _, emitter_pda, emitter_nonce) = {
