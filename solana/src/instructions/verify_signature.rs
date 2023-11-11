@@ -10,7 +10,7 @@ use crate::WORMHOLE_PROGRAM_ID;
 /// the maximum amount of guardian keys in a single instruction
 pub const MAX_LEN_GUARDIAN_KEYS: usize = 19;
 
-#[derive(Clone, PartialEq, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Copy, PartialEq, Debug, BorshSerialize, BorshDeserialize)]
 pub struct VerifySignaturesData {
     /// instruction indices of signers (-1 for missing)
     pub signers: [i8; MAX_LEN_GUARDIAN_KEYS],
@@ -18,7 +18,7 @@ pub struct VerifySignaturesData {
 
 /// represents a guardian which participated in signing some data, whereby `index` is
 /// the guardian's element index from the overall guardian set
-#[derive(Clone, PartialEq, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Copy, PartialEq, Debug, BorshSerialize, BorshDeserialize)]
 pub struct GuardianSignatureMember {
     pub index: usize,
 }
