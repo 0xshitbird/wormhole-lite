@@ -36,6 +36,19 @@ pub fn derive_core_fee_collector() -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"fee_collector"], &WORMHOLE_PROGRAM_ID)
 }
 
+/// derives the guardian set pda
+pub fn derive_guardian_set(guardian_set_index: u32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"GuardianSet", &guardian_set_index.to_be_bytes()[..]],
+        &WORMHOLE_PROGRAM_ID,
+    )
+}
+
+/// derives the posted vaa account
+pub fn derive_posted_vaa(payload_hash: &[u8]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"PostedVAA", &payload_hash], &WORMHOLE_PROGRAM_ID)
+}
+
 #[cfg(test)]
 mod test {
     use solana_program::system_program;
