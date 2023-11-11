@@ -1,5 +1,9 @@
-use borsh::{BorshSerialize, BorshDeserialize};
-use solana_program::{pubkey::Pubkey, instruction::{Instruction, AccountMeta}, sysvar};
+use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::{
+    instruction::{AccountMeta, Instruction},
+    pubkey::Pubkey,
+    sysvar,
+};
 
 use crate::WORMHOLE_PROGRAM_ID;
 
@@ -36,21 +40,18 @@ impl VerifySignaturesData {
     }
 }
 
-
 /// initializes a default signatures data set defaulting to -1 for all members
 impl Default for VerifySignaturesData {
     fn default() -> Self {
         Self {
-            signers: [-1_i8; MAX_LEN_GUARDIAN_KEYS]
+            signers: [-1_i8; MAX_LEN_GUARDIAN_KEYS],
         }
     }
 }
 
 impl GuardianSignatureMember {
     pub fn new(index: usize) -> Self {
-        Self {
-            index
-        }
+        Self { index }
     }
 }
 
@@ -62,7 +63,6 @@ pub fn create_verify_signature_ix(
     data: VerifySignaturesData,
 ) -> Option<Instruction> {
     let (guardian_set, _) = crate::utils::derivations::derive_guardian_set(guardian_set_index);
-
 
     Some(Instruction {
         program_id: WORMHOLE_PROGRAM_ID,
@@ -100,9 +100,7 @@ mod test {
             GuardianSignatureMember::new(16),
             GuardianSignatureMember::new(17),
         ];
-        let want_members = vec![
-        0, 1, 3, 4, 6, 7, 9, 11, 12, 13, 14, 16, 17
-        ];
+        let want_members = vec![0, 1, 3, 4, 6, 7, 9, 11, 12, 13, 14, 16, 17];
         let verify_sig_data = VerifySignaturesData::parse_signature_set(&members[..]).unwrap();
         for want in want_members {
             //println!("guardian index {}, signed {}", want, verify_sig_data.signers[want as usize]);
