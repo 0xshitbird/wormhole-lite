@@ -10,9 +10,6 @@ use wormhole_explorer_client::{self, endpoints::vaa::ExplorerVaa};
 
 use crate::client::secp256k1_helpers::{make_secp256k1_instruction_data, SecpSignature};
 
-/// numbers of signatures permitted in a single batch of verification
-pub const BATCH_SIZE: usize = 7;
-
 /// contains the start, and end indices of the the signed vaa guardian_set
 /// that are to be used in a verify_signature instruction
 pub struct SignatureBatchParameters {
@@ -40,6 +37,8 @@ pub async fn create_vaa_verification_instructions(
     wormhole_signature_account: Pubkey,
     rpc: &solana_client::nonblocking::rpc_client::RpcClient,
     explorer_vaa: &ExplorerVaa,
+    // the number of signatures that can be batched into a single secp256k1 verification instruction
+    batch_size: usize,
 ) -> anyhow::Result<VaaSignatureVerificationBundle> {
     let deser_vaa = explorer_vaa.deser_vaa()?;
     let signature_length = deser_vaa.header.signatures.len();
@@ -48,21 +47,21 @@ pub async fn create_vaa_verification_instructions(
         crate::utils::derivations::derive_guardian_set(deser_vaa.header.guardian_set_index);
     let mut guardian_set = load_guardian_set_account(guardian_set_key, rpc).await?;
 
-    let batches = get_batches(deser_vaa.header.signatures.len());
+    let batches = get_batches(deser_vaa.header.signatures.len(), batch_size);
 
     let mut tx_bundle = VaaSignatureVerificationBundle::new(batches);
 
     for i in 0..batches {
-        let batch_params = SignatureBatchParameters::new(i, signature_length);
+        let batch_params = SignatureBatchParameters::new(i, signature_length, batch_size);
         // used to indicate which guardians of the wormhole network's list of all guardians
         // that were involved in signing the vaa
         let mut signature_status: [i8; MAX_LEN_GUARDIAN_KEYS] = [-1_i8; MAX_LEN_GUARDIAN_KEYS];
         // holds each individual guardian's signature of the vaa
-        let mut signatures = Vec::with_capacity(BATCH_SIZE);
+        let mut signatures = Vec::with_capacity(batch_size);
         // public keys of guardians
-        let mut guardian_keys = Vec::with_capacity(BATCH_SIZE);
+        let mut guardian_keys = Vec::with_capacity(batch_size);
         // contains signature information in the format needed by the secp256k1 program
-        let mut secp_signatures = Vec::with_capacity(BATCH_SIZE);
+        let mut secp_signatures = Vec::with_capacity(batch_size);
         for j in 0..(batch_params.end - batch_params.start) {
             let guardian_signature = &deser_vaa.header.signatures[j + batch_params.start];
             // set the sig verification status based on the index of the guardian
@@ -122,15 +121,15 @@ pub async fn load_guardian_set_account(
 
 /// returns the number of batched secp256k1 ix + verify_signature ix that must be
 /// sent before a VAA can be posted
-pub fn get_batches(signature_length: usize) -> usize {
-    (signature_length as f64 / BATCH_SIZE as f64).ceil() as usize
+pub fn get_batches(signature_length: usize, batch_size: usize) -> usize {
+    (signature_length as f64 / batch_size as f64).ceil() as usize
 }
 
 impl SignatureBatchParameters {
-    pub fn new(loop_iteration: usize, signature_length: usize) -> Self {
+    pub fn new(loop_iteration: usize, signature_length: usize, batch_size: usize) -> Self {
         Self {
-            start: loop_iteration * BATCH_SIZE,
-            end: usize::min(signature_length, (loop_iteration + 1) * BATCH_SIZE),
+            start: loop_iteration * batch_size,
+            end: usize::min(signature_length, (loop_iteration + 1) * batch_size),
         }
     }
 }
@@ -148,12 +147,12 @@ mod test {
     use super::*;
     #[test]
     fn test_get_batches() {
-        let num_batches = get_batches(13);
-        assert_eq!(num_batches, 2);
+        let num_batches = get_batches(13, 3);
+        assert_eq!(num_batches, 5);
     }
     #[tokio::test]
     async fn test_load_guardian_set_account() {
-        let rpc = solana_client::nonblocking::rpc_client::RpcClient::new("https://quiet-cool-waterfall.solana-mainnet.quiknode.pro/3b7848ce3a28b7de7fe04739500e9d50b906cae4/".to_string());
+        let rpc = solana_client::nonblocking::rpc_client::RpcClient::new("..".to_string());
         let (guardian_key, _) = crate::utils::derivations::derive_guardian_set(3);
         let guardian_set = load_guardian_set_account(guardian_key, &rpc).await.unwrap();
         println!("{:#?}", guardian_set);
