@@ -13,8 +13,8 @@ use crate::client::secp256k1_helpers::{make_secp256k1_instruction_data, SecpSign
 /// numbers of signatures permitted in a single batch of verification
 pub const BATCH_SIZE: usize = 7;
 
-/// contains the start, and end indices of the guardian signatures
-/// used in a single batch
+/// contains the start, and end indices of the the signed vaa guardian_set
+/// that are to be used in a verify_signature instruction
 pub struct SignatureBatchParameters {
     pub start: usize,
     pub end: usize,
@@ -29,14 +29,6 @@ pub struct SignatureBatchParameters {
 #[derive(Clone, Default)]
 pub struct VaaSignatureVerificationBundle {
     pub txs: Vec<Transaction>,
-}
-
-impl VaaSignatureVerificationBundle {
-    pub fn new(batch_size: usize) -> Self {
-        Self {
-            txs: Vec::with_capacity(batch_size),
-        }
-    }
 }
 
 /// parses a wormhole VAA into the instructions needed to verify it on chain
@@ -62,9 +54,14 @@ pub async fn create_vaa_verification_instructions(
 
     for i in 0..batches {
         let batch_params = SignatureBatchParameters::new(i, signature_length);
+        // used to indicate which guardians of the wormhole network's list of all guardians
+        // that were involved in signing the vaa
         let mut signature_status: [i8; MAX_LEN_GUARDIAN_KEYS] = [-1_i8; MAX_LEN_GUARDIAN_KEYS];
+        // holds each individual guardian's signature of the vaa
         let mut signatures = Vec::with_capacity(BATCH_SIZE);
+        // public keys of guardians
         let mut guardian_keys = Vec::with_capacity(BATCH_SIZE);
+        // contains signature information in the format needed by the secp256k1 program
         let mut secp_signatures = Vec::with_capacity(BATCH_SIZE);
         for j in 0..(batch_params.end - batch_params.start) {
             let guardian_signature = &deser_vaa.header.signatures[j + batch_params.start];
@@ -87,7 +84,7 @@ pub async fn create_vaa_verification_instructions(
                 message: verification_hash.0,
             })
         }
-        // we will always be executing this in instruction idnex 0
+        // we will always be executing this in instruction index 0 due to requirements of wormhole's verify_signature instruction
         let secp_instruction_data = make_secp256k1_instruction_data(&secp_signatures, 0)?;
         let secp256k1_ix = Instruction::new_with_bytes(
             solana_sdk::secp256k1_program::ID,
@@ -110,6 +107,8 @@ pub async fn create_vaa_verification_instructions(
     Ok(tx_bundle)
 }
 
+/// loads the guardian set account which contains the actual public keys
+/// of the guardians that were used to verify sign the VAA
 pub async fn load_guardian_set_account(
     key: Pubkey,
     rpc: &solana_client::nonblocking::rpc_client::RpcClient,
@@ -121,6 +120,12 @@ pub async fn load_guardian_set_account(
     GuardianSet::try_from_slice(&account_data[..]).with_context(|| "failed to parse account data")
 }
 
+/// returns the number of batched secp256k1 ix + verify_signature ix that must be
+/// sent before a VAA can be posted
+pub fn get_batches(signature_length: usize) -> usize {
+    (signature_length as f64 / BATCH_SIZE as f64).ceil() as usize
+}
+
 impl SignatureBatchParameters {
     pub fn new(loop_iteration: usize, signature_length: usize) -> Self {
         Self {
@@ -130,8 +135,12 @@ impl SignatureBatchParameters {
     }
 }
 
-pub fn get_batches(signature_length: usize) -> usize {
-    (signature_length as f64 / BATCH_SIZE as f64).ceil() as usize
+impl VaaSignatureVerificationBundle {
+    pub fn new(batch_size: usize) -> Self {
+        Self {
+            txs: Vec::with_capacity(batch_size),
+        }
+    }
 }
 
 #[cfg(test)]

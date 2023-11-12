@@ -9,6 +9,7 @@ pub struct SecpSignature {
     pub signature: [u8; SIGNATURE_SERIALIZED_SIZE],
     pub recovery_id: u8,
     pub eth_address: [u8; HASHED_PUBKEY_SERIALIZED_SIZE],
+    /// this is the hash of the payload in the VAA
     pub message: [u8; 32],
 }
 
