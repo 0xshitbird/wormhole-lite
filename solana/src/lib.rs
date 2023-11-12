@@ -12,6 +12,10 @@ pub mod instructions;
 /// structured payloads for handling arbitrary messages
 pub mod message_payload;
 
+/// provides an offchain client client that can be used to interact with the wormhole bridge through rpc
+#[cfg(feature = "client")]
+pub mod client;
+
 /// id of the core wormhole program
 pub const WORMHOLE_PROGRAM_ID: Pubkey =
     solana_program::pubkey!("worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth");

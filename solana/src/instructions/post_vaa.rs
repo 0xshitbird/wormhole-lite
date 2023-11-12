@@ -1,7 +1,12 @@
 use std::io::Cursor;
 
 use borsh::BorshSerialize;
-use solana_program::{entrypoint::ProgramResult, instruction::{Instruction, AccountMeta}, pubkey::Pubkey, sysvar};
+use solana_program::{
+    entrypoint::ProgramResult,
+    instruction::{AccountMeta, Instruction},
+    pubkey::Pubkey,
+    sysvar,
+};
 use wormhole_anchor_sdk::wormhole::Instruction as WormholeIx;
 
 use crate::WORMHOLE_PROGRAM_ID;
@@ -69,7 +74,6 @@ pub fn hash_vaa(vaa: &PostVAADataIx) -> [u8; 32] {
     h.finalize().into()
 }
 
-
 impl From<PostVAADataIx> for WormholeIx {
     fn from(value: PostVAADataIx) -> Self {
         Self::PostVAA {
@@ -89,7 +93,7 @@ impl From<PostVAADataIx> for WormholeIx {
 pub fn create_post_vaa_ix(
     vaa_data: PostVAADataIx,
     payer: Pubkey,
-    signature_set: Pubkey
+    signature_set: Pubkey,
 ) -> Option<Instruction> {
     let (posted_vaa, _) = vaa_data.derive_posted_vaa_account();
     let (guardian_set, _) = vaa_data.derive_guardian_set();
@@ -99,7 +103,10 @@ pub fn create_post_vaa_ix(
             program_id: WORMHOLE_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(guardian_set, false),
-                AccountMeta::new_readonly(crate::utils::derivations::derive_core_bridge_config().0, false),
+                AccountMeta::new_readonly(
+                    crate::utils::derivations::derive_core_bridge_config().0,
+                    false,
+                ),
                 AccountMeta::new_readonly(signature_set, false),
                 AccountMeta::new(posted_vaa, false), // aka message
                 AccountMeta::new(payer, true),

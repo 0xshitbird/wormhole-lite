@@ -5,6 +5,12 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
+# disbale the default features if you only want to use this crate on-chain
+[features]
+default = ["client"]
+client = ["tokio", "wormhole-explorer-client", "solana-client", "solana-sdk", "anyhow"]
+
 [dependencies.solana-program]
 version = "1.16"
 [dependencies.wormhole-anchor-sdk]
@@ -17,5 +23,24 @@ version = "0.3.7"
 version = "0.10"
 [dependencies.sha3]
 version = "0.10"
+[dependencies.bincode]
+version = "1"
+[dependencies.tokio]
+optional = true
+version = "1"
+features = ["full", "parking_lot"]
+[dependencies.wormhole-explorer-client]
+optional = true
+git = "https://github.com/wormhole-foundation/wormhole-sdk-rs"
+[dependencies.solana-client]
+optional = true
+version = "1.16"
+[dependencies.solana-sdk]
+optional = true
+version = "1.16"
+[dependencies.anyhow]
+optional = true
+version = "1"
+
 [dev-dependencies.hex]
 version = "0.4"

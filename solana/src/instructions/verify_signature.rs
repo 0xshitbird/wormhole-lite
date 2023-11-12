@@ -101,6 +101,7 @@ mod test {
             GuardianSignatureMember::new(16),
             GuardianSignatureMember::new(17),
         ];
+        println!("{}", members.len());
         let want_members = vec![0, 1, 3, 4, 6, 7, 9, 11, 12, 13, 14, 16, 17];
         let verify_sig_data = VerifySignaturesData::parse_signature_set(&members[..]).unwrap();
         for want in want_members {
