@@ -38,7 +38,7 @@ pub async fn create_vaa_verification_instructions(
     payer: Pubkey,
     // the account which will store signature verification data onchain
     wormhole_signature_account: Pubkey,
-    rpc: solana_client::nonblocking::rpc_client::RpcClient,
+    rpc: &solana_client::nonblocking::rpc_client::RpcClient,
     explorer_vaa: &ExplorerVaa,
 ) -> anyhow::Result<VaaSignatureVerificationBundle> {
     let deser_vaa = explorer_vaa.deser_vaa()?;
@@ -46,7 +46,7 @@ pub async fn create_vaa_verification_instructions(
     let verification_hash = deser_vaa.body.digest();
     let (guardian_set_key, _) =
         crate::utils::derivations::derive_guardian_set(deser_vaa.header.guardian_set_index);
-    let mut guardian_set = load_guardian_set_account(guardian_set_key, &rpc).await?;
+    let mut guardian_set = load_guardian_set_account(guardian_set_key, rpc).await?;
 
     let batches = get_batches(deser_vaa.header.signatures.len());
 
