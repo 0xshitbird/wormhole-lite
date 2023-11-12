@@ -4,6 +4,7 @@ use solana_program::{
     pubkey::Pubkey,
     sysvar,
 };
+use wormhole_anchor_sdk::wormhole::Instruction as WormholeIx;
 
 use crate::WORMHOLE_PROGRAM_ID;
 
@@ -77,7 +78,7 @@ pub fn create_verify_signature_ix(
             AccountMeta::new_readonly(solana_program::system_program::id(), false),
         ],
 
-        data: data.try_to_vec().ok()?,
+        data: WormholeIx::VerifySignatures { signers: data.signers }.try_to_vec().ok()?
     })
 }
 
