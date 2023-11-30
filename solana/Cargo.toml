@@ -41,6 +41,9 @@ version = "1.16"
 [dependencies.anyhow]
 optional = true
 version = "1"
-
+[dependencies.serde]
+version = "1"
+[dependencies.thiserror]
+version = "1"
 [dev-dependencies.hex]
 version = "0.4"
