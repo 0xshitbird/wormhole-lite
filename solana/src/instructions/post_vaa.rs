@@ -40,12 +40,19 @@ pub struct PostVAADataIx {
 }
 
 impl PostVAADataIx {
+    /// derives the guardian set account which stores information about the 
+    /// guardians who signed teh vaa
     pub fn derive_guardian_set(&self) -> (Pubkey, u8) {
         crate::utils::derivations::derive_guardian_set(self.guardian_set_index)
     }
+    /// given the vaa paylaod hash, return the account used for storing its information
     pub fn derive_posted_vaa_account(&self) -> (Pubkey, u8) {
         let payload_hash = hash_vaa(self).to_vec();
         crate::utils::derivations::derive_posted_vaa(&payload_hash)
+    }
+    /// hashes the serialized vaa, which is the data signed by the guardian network
+    pub fn hash_vaa(&self) -> [u8; 32] {
+        hash_vaa(self)
     }
 }
 
@@ -90,6 +97,8 @@ impl From<PostVAADataIx> for WormholeIx {
     }
 }
 
+/// creates a post_vaa instruction which should be invoked after running
+/// the verify_signature instruction
 pub fn create_post_vaa_ix(
     vaa_data: PostVAADataIx,
     payer: Pubkey,
