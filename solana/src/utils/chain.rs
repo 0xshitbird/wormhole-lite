@@ -188,6 +188,15 @@ impl FromStr for Chain {
     type Err = InvalidChainError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("arbitrum") {
+            return Ok(Chain::Arbitrum);
+        } else if s.eq_ignore_ascii_case("ethereum") {
+            return Ok(Chain::Ethereum);
+        } else if s.eq_ignore_ascii_case("optimism") {
+            return Ok(Chain::Optimism);
+        } else if s.eq_ignore_ascii_case("base") {
+            return Ok(Chain::Base);
+        }
         match s {
             "Any" | "any" | "ANY" => Ok(Chain::Any),
             "Solana" | "solana" | "SOLANA" => Ok(Chain::Solana),

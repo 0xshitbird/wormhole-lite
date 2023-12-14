@@ -9,7 +9,7 @@ use solana_program::{
 };
 use wormhole_anchor_sdk::wormhole::Instruction as WormholeIx;
 
-use crate::{WORMHOLE_PROGRAM_ID, state::vaa::MessageData};
+use crate::WORMHOLE_PROGRAM_ID;
 
 /// The actual VAA which we are posting to the bridge and verifying
 ///
@@ -37,22 +37,6 @@ pub struct PostVAADataIx {
     pub sequence: u64,
     pub consistency_level: u8,
     pub payload: Vec<u8>,
-}
-
-impl From<MessageData> for PostVAADataIx {
-    fn from(value: MessageData) -> Self {
-        Self {
-            version: value.vaa_version,
-            guardian_set_index: 0, // todo
-            timestamp: value.vaa_time,
-            nonce: value.nonce,
-            emitter_chain:  value.emitter_chain,
-            emitter_address: value.emitter_address,
-            sequence: value.sequence,
-            consistency_level: value.consistency_level,
-            payload: value.payload
-        }
-    }   
 }
 
 impl PostVAADataIx {
