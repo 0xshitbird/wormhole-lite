@@ -26,7 +26,7 @@ use crate::WORMHOLE_PROGRAM_ID;
 ///  payload
 ///
 /// The above api call returns a `hash` parameter which is the payload hash
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PostVAADataIx {
     pub version: u8,
     pub guardian_set_index: u32,

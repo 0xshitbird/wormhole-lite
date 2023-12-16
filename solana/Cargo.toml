@@ -43,6 +43,7 @@ optional = true
 version = "1"
 [dependencies.serde]
 version = "1"
+feateures = ["derive"]
 [dependencies.thiserror]
 version = "1"
 [dev-dependencies.hex]
