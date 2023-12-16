@@ -11,7 +11,7 @@ use crate::WORMHOLE_PROGRAM_ID;
 /// the maximum amount of guardian keys in a single instruction
 pub const MAX_LEN_GUARDIAN_KEYS: usize = 19;
 
-#[derive(Clone, Copy, PartialEq, Debug, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Copy, PartialEq, Debug, BorshSerialize, BorshDeserialize, serde::Serialize, serde::Deserialize)]
 pub struct VerifySignaturesData {
     /// instruction indices of signers (-1 for missing)
     pub signers: [i8; MAX_LEN_GUARDIAN_KEYS],
